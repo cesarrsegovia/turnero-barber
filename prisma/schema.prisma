@@ -1,0 +1,32 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String   // En un caso real esto iría hasheado, aquí lo haremos simple primero
+  createdAt DateTime @default(now())
+}
+
+model Appointment {
+  id          String   @id @default(uuid())
+  date        DateTime // Fecha y hora exacta del turno (ej: 2023-10-25 14:00:00)
+  isBooked    Boolean  @default(false)
+  clientName  String?  // Opcional: nombre del cliente si está reservado
+  createdAt   DateTime @default(now())
+
+  // Índices para que las búsquedas por fecha sean rápidas (Performance 101)
+  @@index([date])
+}
