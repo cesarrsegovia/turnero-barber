@@ -1,7 +1,7 @@
 'use client'; // 👈 Obligatorio para usar useState, useEffect y onClick
 
 import { useState, useEffect } from 'react';
-import { generateDaySlots, getAppointmentsForDay, cancelAppointment } from '@/actions/appointments'; // Importamos tus acciones
+import { generateDaySlots, getAppointmentsForDay, cancelAppointment, updateConfig, getConfig } from '@/actions/appointments'; // Importamos tus acciones
 import { format } from 'date-fns'; // Para formatear fechas bonito
 import { es } from 'date-fns/locale'; // Español para los días
 
@@ -19,12 +19,34 @@ export default function AdminDashboard() {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [slots, setSlots] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
+  // Nuevos estados para la configuración
+  const [config, setConfig] = useState({ startHour: 9, endHour: 18, interval: 30 });
+  const [showConfig, setShowConfig] = useState(false);
 
+
+  // Efecto para cargar la config al iniciar
+  useEffect(() => {
+    getConfig().then(data => setConfig(data));
+  }, []);
   // --- EFECTOS (Lo que pasa automáticamente) ---
   // Cada vez que cambie la fecha (selectedDate), buscamos los turnos
   useEffect(() => {
     fetchSlots();
   }, [selectedDate]);
+
+  // Handler para guardar config
+  const handleSaveConfig = async (formData: FormData) => {
+    const res = await updateConfig(formData);
+    if (res.success) {
+      alert('Configuración actualizada. Los próximos días que generes usarán este horario.');
+      setShowConfig(false);
+      // Actualizamos el estado local
+      const newConfig = await getConfig();
+      setConfig(newConfig);
+    } else {
+      alert('Error: ' + res?.error);
+    }
+  };
 
   // Función auxiliar para cargar datos
   async function fetchSlots() {
@@ -63,6 +85,46 @@ export default function AdminDashboard() {
         <h1 className="text-3xl font-bold text-white">Panel de Administración</h1>
         <p className="text-gray-400">Gestiona la disponibilidad de la barbería</p>
       </header>
+
+      {/* Botón para mostrar configuración */}
+      <div className="mb-6">
+        <button 
+          onClick={() => setShowConfig(!showConfig)}
+          className="text-barber-orange text-sm underline hover:text-white transition-colors"
+        >
+          {showConfig ? 'Ocultar Configuración' : '⚙️ Configurar Horarios de Apertura'}
+        </button>
+
+        {/* Formulario de Configuración (Desplegable) */}
+        {showConfig && (
+          <form action={handleSaveConfig} className="mt-4 bg-barber-gray/50 p-4 rounded-xl border border-barber-orange/30 flex flex-wrap gap-4 items-end">
+            
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-400">Apertura (Hora)</label>
+              <input name="startHour" type="number" defaultValue={config.startHour} min="0" max="23" className="bg-black p-2 rounded border border-gray-700 w-20 text-center" />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-400">Cierre (Hora)</label>
+              <input name="endHour" type="number" defaultValue={config.endHour} min="0" max="23" className="bg-black p-2 rounded border border-gray-700 w-20 text-center" />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-400">Intervalo (Min)</label>
+              <select name="interval" defaultValue={config.interval} className="bg-black p-2 rounded border border-gray-700 w-24 text-center">
+                <option value="15">15 min</option>
+                <option value="30">30 min</option>
+                <option value="45">45 min</option>
+                <option value="60">60 min</option>
+              </select>
+            </div>
+
+            <button type="submit" className="bg-barber-orange text-white px-4 py-2 rounded hover:bg-orange-600 transition-colors text-sm font-bold h-10">
+              Guardar Cambios
+            </button>
+          </form>
+        )}
+      </div>
 
       {/* Controles Principales */}
       <div className="flex flex-col md:flex-row gap-4 mb-8 items-end">

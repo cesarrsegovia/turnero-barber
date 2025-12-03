@@ -5,6 +5,7 @@ import { getAppointmentsForDay, bookAppointment } from '@/actions/appointments';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 type Appointment = {
   id: string;
@@ -40,19 +41,33 @@ export default function ClientBooking() {
   };
 
   const confirmBooking = async () => {
-    if (!bookingSlot || !clientName.trim()) return alert('Por favor escribe tu nombre');
+    if (!bookingSlot || !clientName.trim()){
+      toast.error('Por favor, ingresa tu nombre para reservar el turno.');
+      return;
+    }
 
     setBookingLoading(true);
-    const res = await bookAppointment(bookingSlot.id, clientName);
+    const promise = bookAppointment(bookingSlot.id, clientName);
 
-    if (res.success) {
-      alert('¡Turno reservado con éxito! Te esperamos.');
-      setBookingSlot(null); // Cerrar modal
-      fetchSlots(); // Recargar lista
-    } else {
-      alert('Error: ' + res.error);
+    toast.promise(promise, {
+      loading: 'Reservando tu lugar...',
+      success: (data) => {
+        if (data.success) {
+          setBookingSlot(null);
+          fetchSlots();
+          return `¡Listo ${clientName}! Te esperamos a las ${format(new Date(bookingSlot.date), 'HH:mm')}`;
+        } else {
+          throw new Error(data.error);
+        }
+      },
+      error: (err) => `Error: ${err.message}`,
+    });
+    // limpiamos el estado de carga al final si es necesario
+    try {
+      await promise;
+    } finally {
+      setBookingLoading(false);
     }
-    setBookingLoading(false);
   };
 
   return (

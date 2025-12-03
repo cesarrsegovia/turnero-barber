@@ -4,6 +4,13 @@ import prisma from '@/lib/prisma';
 import { addMinutes, setHours, setMinutes, startOfDay, endOfDay, isBefore } from 'date-fns';
 import { revalidatePath } from 'next/cache';
 
+// 1. Función auxiliar para obtener la config (Privada, no se exporta)
+async function getBusinessConfig() {
+  const config = await prisma.businessConfig.findFirst();
+  // Si por alguna razón no hay config, devolvemos un fallback seguro
+  return config || { startHour: 9, endHour: 18, interval: 30 };
+}
+
 // --- LÓGICA 1: GENERAR TURNOS (Para el Admin) ---
 // Esta función crea "huecos" vacíos para un día específico.
 // Ej: Generar slots para el "2025-12-01" cada 30 mins de 9am a 6pm.
@@ -11,24 +18,18 @@ export async function generateDaySlots(dateString: string) {
   try {
     const baseDate = new Date(dateString);
     
-    // Configuración de la Barbería (Podría venir de una DB de config)
-    const WORK_START_HOUR = 9; // 09:00
-    const WORK_END_HOUR = 18;  // 18:00
-    const DURATION_MINUTES = 30; 
+    // 👇 AQUÍ ESTÁ EL CAMBIO: Leemos de la DB
+    const { startHour, endHour, interval } = await getBusinessConfig();
 
-    // Definimos el inicio y fin del día laboral
-    let currentTime = setMinutes(setHours(baseDate, WORK_START_HOUR), 0);
-    const endTime = setMinutes(setHours(baseDate, WORK_END_HOUR), 0);
+    // Usamos las variables dinámicas
+    let currentTime = setMinutes(setHours(baseDate, startHour), 0);
+    const endTime = setMinutes(setHours(baseDate, endHour), 0);
 
     const slotsToCreate = [];
 
-    // Bucle: Mientras la hora actual sea menor al cierre...
     while (isBefore(currentTime, endTime)) {
-      // Verificamos si ya existe un turno a esa hora para no duplicar
       const exists = await prisma.appointment.findFirst({
-        where: {
-          date: currentTime
-        }
+        where: { date: currentTime }
       });
 
       if (!exists) {
@@ -38,18 +39,16 @@ export async function generateDaySlots(dateString: string) {
         });
       }
 
-      // Avanzamos 30 minutos
-      currentTime = addMinutes(currentTime, DURATION_MINUTES);
+      // 👇 Usamos el intervalo dinámico
+      currentTime = addMinutes(currentTime, interval);
     }
 
-    // Inserción masiva (Muy eficiente)
     if (slotsToCreate.length > 0) {
       await prisma.appointment.createMany({
         data: slotsToCreate,
       });
     }
 
-    // Importante: Avisamos a Next que los datos cambiaron para refrescar la UI
     revalidatePath('/admin'); 
     return { success: true, count: slotsToCreate.length };
 
@@ -117,4 +116,37 @@ export async function cancelAppointment(id: string) {
   } catch (error) {
     return { success: false, error: "Error cancelando turno" };
   }
+}
+
+// 3. NUEVA ACCIÓN: Para actualizar la configuración desde el Admin
+export async function updateConfig(formData: FormData) {
+  const startHour = parseInt(formData.get('startHour') as string);
+  const endHour = parseInt(formData.get('endHour') as string);
+  const interval = parseInt(formData.get('interval') as string);
+
+  // Validaciones básicas
+  if (startHour >= endHour) return { success: false, error: "La apertura debe ser antes del cierre" };
+
+  // Actualizamos el primer registro que encontremos (Singleton pattern para config)
+  const config = await prisma.businessConfig.findFirst();
+  
+  if (config) {
+    await prisma.businessConfig.update({
+      where: { id: config.id },
+      data: { startHour, endHour, interval }
+    });
+  } else {
+    // Fallback por si acaso
+    await prisma.businessConfig.create({
+      data: { startHour, endHour, interval }
+    });
+  }
+  
+  revalidatePath('/admin');
+  return { success: true };
+}
+
+// 4. NUEVA ACCIÓN: Para leer la configuración actual en el frontend
+export async function getConfig() {
+  return await getBusinessConfig();
 }

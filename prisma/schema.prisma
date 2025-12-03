@@ -30,3 +30,11 @@ model Appointment {
   // Índices para que las búsquedas por fecha sean rápidas (Performance 101)
   @@index([date])
 }
+
+model BusinessConfig {
+  id          String   @id @default(uuid())
+  startHour   Int      @default(9)  // Hora de apertura (0-23)
+  endHour     Int      @default(18) // Hora de cierre (0-23)
+  interval    Int      @default(30) // Duración del turno en minutos
+  updatedAt   DateTime @updatedAt
+}
