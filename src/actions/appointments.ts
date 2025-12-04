@@ -150,3 +150,37 @@ export async function updateConfig(formData: FormData) {
 export async function getConfig() {
   return await getBusinessConfig();
 }
+
+
+// 5. NUEVA ACCIÓN: Buscar turnos futuros o por nombre
+export async function searchAppointments(query: string = '') {
+  try {
+    const now = new Date();
+    
+    // Configuración de la consulta
+    const appointments = await prisma.appointment.findMany({
+      where: {
+        isBooked: true, // Solo nos interesan los reservados
+        date: {
+          gte: now, // Solo turnos futuros (gte = Greater Than or Equal)
+        },
+        // Si hay texto de búsqueda, filtramos por nombre
+        ...(query ? {
+          clientName: {
+            contains: query, // Búsqueda parcial (ej: "Car" encuentra "Carlos")
+            // mode: 'insensitive' // (Opcional: SQLite no soporta esto nativamente bien, pero en Postgres sí)
+          }
+        } : {})
+      },
+      orderBy: {
+        date: 'asc', // Los más próximos primero
+      },
+      take: 10, // Limitamos a 10 para no saturar la vista
+    });
+
+    return { success: true, data: appointments };
+  } catch (error) {
+    console.error(error);
+    return { success: false, error: "Error al buscar turnos" };
+  }
+}
