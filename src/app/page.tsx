@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getAppointmentsForDay, bookAppointment } from '@/actions/appointments';
-import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -55,7 +55,7 @@ export default function ClientBooking() {
         if (data.success) {
           setBookingSlot(null);
           fetchSlots();
-          return `¡Listo ${clientName}! Te esperamos a las ${format(new Date(bookingSlot.date), 'HH:mm')}`;
+          return `¡Listo ${clientName}! Te esperamos a las ${formatInTimeZone(new Date(bookingSlot.date), 'UTC', "EEEE dd 'de' MMMM - HH:mm", { locale: es })}`;
         } else {
           throw new Error(data.error);
         }
@@ -120,7 +120,7 @@ export default function ClientBooking() {
             >
               <span className={`text-lg font-bold ${slot.isBooked ? 'text-barber-red' : 'text-white group-hover:text-black'}`}>
                 {/* 🔴 CAMBIO: El texto de la hora también se pone rojo si está ocupado */}
-                {format(new Date(slot.date), 'HH:mm')}
+                {formatInTimeZone(new Date(slot.date), 'UTC', 'HH:mm')}
               </span>
               <span className={`text-[10px] uppercase mt-1 font-bold ${slot.isBooked ? 'text-barber-red' : 'text-gray-400 group-hover:text-black'}`}>
                 {slot.isBooked ? 'Ocupado' : 'Disponible'}
@@ -136,7 +136,7 @@ export default function ClientBooking() {
           <div className="bg-barber-gray p-6 rounded-2xl w-full max-w-sm border border-gray-700 shadow-2xl">
             <h3 className="text-xl font-bold text-white mb-1">Confirmar Turno</h3>
             <p className="text-barber-green mb-6">
-              {format(new Date(bookingSlot.date), "EEEE dd 'de' MMMM - HH:mm", { locale: es })} hs
+              {formatInTimeZone(new Date(bookingSlot.date), 'UTC', "EEEE dd 'de' MMMM - HH:mm", { locale: es })} hs
             </p>
 
             <div className="space-y-4">

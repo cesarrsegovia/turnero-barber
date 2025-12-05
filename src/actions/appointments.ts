@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { addMinutes, setHours, setMinutes, startOfDay, endOfDay, isBefore } from 'date-fns';
 import { revalidatePath } from 'next/cache';
 
+
 // 1. Función auxiliar para obtener la config (Privada, no se exporta)
 async function getBusinessConfig() {
   const config = await prisma.businessConfig.findFirst();
@@ -16,18 +17,22 @@ async function getBusinessConfig() {
 // Ej: Generar slots para el "2025-12-01" cada 30 mins de 9am a 6pm.
 export async function generateDaySlots(dateString: string) {
   try {
-    const baseDate = new Date(dateString);
-    
-    // 👇 AQUÍ ESTÁ EL CAMBIO: Leemos de la DB
+    // 👇 LÓGICA CORREGIDA: Construcción manual de ISO String UTC
+    // Esto evita que el servidor use su zona horaria local.
     const { startHour, endHour, interval } = await getBusinessConfig();
-
-    // Usamos las variables dinámicas
-    let currentTime = setMinutes(setHours(baseDate, startHour), 0);
-    const endTime = setMinutes(setHours(baseDate, endHour), 0);
+    
+    // Creamos la fecha de inicio explícitamente en UTC (Z al final)
+    // Ejemplo: "2025-12-07T09:00:00.000Z"
+    const startIso = `${dateString}T${startHour.toString().padStart(2, '0')}:00:00.000Z`;
+    const endIso = `${dateString}T${endHour.toString().padStart(2, '0')}:00:00.000Z`;
+    
+    let currentTime = new Date(startIso);
+    const endTime = new Date(endIso);
 
     const slotsToCreate = [];
 
-    while (isBefore(currentTime, endTime)) {
+    while (currentTime < endTime) {
+      // Verificamos existencia
       const exists = await prisma.appointment.findFirst({
         where: { date: currentTime }
       });
@@ -39,7 +44,7 @@ export async function generateDaySlots(dateString: string) {
         });
       }
 
-      // 👇 Usamos el intervalo dinámico
+      // Avanzamos
       currentTime = addMinutes(currentTime, interval);
     }
 

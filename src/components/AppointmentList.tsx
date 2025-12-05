@@ -2,25 +2,21 @@
 
 import { useState, useEffect } from 'react';
 import { searchAppointments, cancelAppointment } from '@/actions/appointments';
-import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz'; // 👈 Usamos date-fns-tz
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 export default function AppointmentList() {
   const [query, setQuery] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Función para buscar
   const handleSearch = async (text: string) => {
     setQuery(text);
-    // Debounce simple: Podríamos esperar a que deje de escribir, 
-    // pero por ahora buscaremos directo para ver la reactividad.
   };
 
-  // Efecto: Busca cuando cambia el texto o al cargar
   useEffect(() => {
-    // Pequeño delay para no saturar mientras escribes
     const timer = setTimeout(async () => {
       setLoading(true);
       const res = await searchAppointments(query);
@@ -33,11 +29,9 @@ export default function AppointmentList() {
 
   const handleCancel = async (id: string) => {
     if(!confirm('¿Cancelar esta reserva?')) return;
-    
     const res = await cancelAppointment(id);
     if(res.success) {
       toast.success('Reserva cancelada');
-      // Refrescamos la lista manualmente volviendo a buscar
       const updated = await searchAppointments(query);
       if(updated.success) setAppointments(updated.data || []);
     } else {
@@ -51,7 +45,6 @@ export default function AppointmentList() {
         <span>📅</span> Próximos Clientes
       </h2>
 
-      {/* Buscador */}
       <input 
         type="text" 
         placeholder="Buscar por nombre..." 
@@ -60,7 +53,6 @@ export default function AppointmentList() {
         className="w-full bg-black/50 border border-gray-700 rounded-lg p-3 text-white mb-4 focus:border-barber-orange outline-none text-sm"
       />
 
-      {/* Lista */}
       <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
         {loading ? (
           <p className="text-gray-500 text-center text-sm">Buscando...</p>
@@ -71,8 +63,9 @@ export default function AppointmentList() {
             <div key={appt.id} className="bg-black/40 border border-gray-800 p-3 rounded-lg flex justify-between items-center hover:border-barber-green/50 transition-colors group">
               <div>
                 <p className="font-bold text-white text-sm">{appt.clientName}</p>
+                {/* 🔴 CORRECCIÓN: Usamos UTC para mostrar la fecha real de la base de datos */}
                 <p className="text-barber-green text-xs capitalize">
-                  {format(new Date(appt.date), "EEEE dd MMM - HH:mm", { locale: es })}
+                  {formatInTimeZone(new Date(appt.date), 'UTC', "EEEE dd MMM - HH:mm", { locale: es })}
                 </p>
               </div>
               
