@@ -1,7 +1,7 @@
 'use server'; // 👈 Esto marca que todo este archivo se ejecuta en el servidor
 
 import prisma from '@/lib/prisma';
-import { addMinutes, setHours, setMinutes, startOfDay, endOfDay, isBefore } from 'date-fns';
+import { addMinutes } from 'date-fns';
 import { revalidatePath } from 'next/cache';
 
 
@@ -20,12 +20,12 @@ export async function generateDaySlots(dateString: string) {
     // 👇 LÓGICA CORREGIDA: Construcción manual de ISO String UTC
     // Esto evita que el servidor use su zona horaria local.
     const { startHour, endHour, interval } = await getBusinessConfig();
-    
+
     // Creamos la fecha de inicio explícitamente en UTC (Z al final)
     // Ejemplo: "2025-12-07T09:00:00.000Z"
     const startIso = `${dateString}T${startHour.toString().padStart(2, '0')}:00:00.000Z`;
     const endIso = `${dateString}T${endHour.toString().padStart(2, '0')}:00:00.000Z`;
-    
+
     let currentTime = new Date(startIso);
     const endTime = new Date(endIso);
 
@@ -54,7 +54,7 @@ export async function generateDaySlots(dateString: string) {
       });
     }
 
-    revalidatePath('/admin'); 
+    revalidatePath('/admin');
     return { success: true, count: slotsToCreate.length };
 
   } catch (error) {
@@ -67,10 +67,12 @@ export async function generateDaySlots(dateString: string) {
 // Obtiene los turnos de un día específico
 export async function getAppointmentsForDay(dateString: string) {
   const searchDate = new Date(dateString);
-  
-  // Filtramos entre las 00:00 y las 23:59 de ese día
-  const start = startOfDay(searchDate);
-  const end = endOfDay(searchDate);
+
+  // FIX: Forzamos la búsqueda en el día UTC exacto
+  // Si usábamos startOfDay(new Date(dateString)), node usaba la hora local del servidor
+  // y en Latam (UTC-3) eso corría el día para atrás.
+  const start = new Date(`${dateString}T00:00:00.000Z`);
+  const end = new Date(`${dateString}T23:59:59.999Z`);
 
   const appointments = await prisma.appointment.findMany({
     where: {
@@ -97,7 +99,7 @@ export async function bookAppointment(id: string, clientName: string) {
         clientName: clientName,
       },
     });
-    
+
     revalidatePath('/'); // Refrescar la home
     return { success: true };
   } catch (error) {
@@ -115,7 +117,7 @@ export async function cancelAppointment(id: string) {
         clientName: null, // Limpiamos el nombre
       },
     });
-    
+
     revalidatePath('/admin');
     return { success: true };
   } catch (error) {
@@ -134,7 +136,7 @@ export async function updateConfig(formData: FormData) {
 
   // Actualizamos el primer registro que encontremos (Singleton pattern para config)
   const config = await prisma.businessConfig.findFirst();
-  
+
   if (config) {
     await prisma.businessConfig.update({
       where: { id: config.id },
@@ -146,7 +148,7 @@ export async function updateConfig(formData: FormData) {
       data: { startHour, endHour, interval }
     });
   }
-  
+
   revalidatePath('/admin');
   return { success: true };
 }
@@ -161,7 +163,7 @@ export async function getConfig() {
 export async function searchAppointments(query: string = '') {
   try {
     const now = new Date();
-    
+
     // Configuración de la consulta
     const appointments = await prisma.appointment.findMany({
       where: {
