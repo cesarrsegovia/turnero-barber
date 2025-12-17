@@ -15,7 +15,7 @@ export default function AppointmentList() {
   const handleSearch = async (text: string) => {
     setQuery(text);
   };
-  //
+  //dsafff
   useEffect(() => {
     const timer = setTimeout(async () => {
       setLoading(true);
